@@ -1,47 +1,47 @@
-# ESP8266 墨水屏气象站
+# ESP32 墨水屏智能仪表盘
 
-这是一个基于 ESP8266 (NodeMCU/Wemos) 和微雪 (Waveshare) 4.2英寸电子墨水屏的智能天气显示项目。
-<<<<<<< HEAD
+这是一个基于 ESP32 (DOIT ESP32 DEVKIT V1) 和微雪 (Waveshare) 4.2英寸电子墨水屏的智能显示项目。
 
 ## 效果展示
 
 ![项目效果图](images/demo.jpg)
 
-
 ## 功能特性
 
 - **实时天气**：显示当前温度、天气状况、风向和风速。
 - **7天预报**：显示未来7天的每日和夜间预报，包括温度范围和天气图标。
-- **日期与日历**：显示公历日期、星期、农历日期和节气（如“立春”）。
+- **日期与日历**：显示公历日期、星期、农历日期和节气。
 - **室内环境**：通过 MQTT 监测并显示室内温度和湿度。
+- **日程/排班**：支持显示日历事件和排班信息。
+- **空气质量**：显示空气质量指数 (AQI) 和 PM2.5 信息。
 - **智能刷新**：时间更新时进行局部刷新；主要数据变化时进行全屏刷新。
-- **昼夜模式**：根据时间自动切换白天和夜间的天气图标（6:00-18:00 为白天，18:00-6:00 为夜间）。
-- **Web 配置**：内置 Web 服务器，可直接通过浏览器配置 WiFi、MQTT 设置，并支持文件管理。
-- **图标管理**：支持通过 Web 界面上传自定义 BMP 图标；如果文件缺失，会自动回退使用内置的 PROGMEM 图标。
-- **MQTT 集成**：可与 Home Assistant 或其他 MQTT 服务器无缝集成。
-- **一键控制**：单击按钮请求天气更新；长按按钮重置 WiFi 设置。
+- **昼夜模式**：根据时间自动切换白天和夜间的天气图标。
+- **Web 配置**：内置 Web 服务器，可直接通过浏览器配置 WiFi、MQTT、NTP 服务器，并支持文件管理。
+- **MQTT 集成**：支持断线自动重连（带超时放弃机制），可与 Home Assistant 或其他 MQTT 服务器无缝集成。
+- **NTP 同步**：支持自定义 NTP 服务器进行时间同步。
+- **一键控制**：单击按钮切换页面，双击请求更新天气，长按刷新当前页面。
 
 ## 硬件要求
 
-- **ESP8266 开发板**：NodeMCU v2, Wemos D1 Mini 或兼容板。
+- **ESP32 开发板**：DOIT ESP32 DEVKIT V1 (或兼容板)。
 - **电子墨水屏**：微雪 (Waveshare) 4.2英寸电子墨水屏模块 (SPI接口)。
 - **连接线若干**。
 
 ### 引脚配置
 
-| 墨水屏引脚 | ESP8266 GPIO | NodeMCU 引脚 |
+| 墨水屏引脚 | ESP32 GPIO | 描述 |
 | :--- | :--- | :--- |
-| BUSY | GPIO 5 | D1 |
-| RST | GPIO 2 | D4 |
-| DC | GPIO 4 | D2 |
-| CS | GPIO 15 | D8 |
-| CLK | GPIO 14 | D5 |
-| DIN | GPIO 13 | D7 |
-| GND | GND | GND |
-| VCC | 3.3V | 3.3V |
+| BUSY | GPIO 25 | 忙信号 |
+| RST | GPIO 26 | 复位 |
+| DC | GPIO 27 | 数据/命令选择 |
+| CS | GPIO 15 | 片选 |
+| CLK | GPIO 13 | SPI 时钟 |
+| DIN | GPIO 14 | SPI 数据 (MOSI) |
+| GND | GND | 地 |
+| VCC | 3.3V | 电源 |
 
 **其他硬件：**
-- **按钮**：GPIO 12 (D6) (低电平触发/Active Low) - 单击更新天气，长按重置配网。
+- **按钮**：GPIO 0 (Boot 按钮) - 单击切换页面，双击请求天气，长按刷新页面。
 
 ## 软件设置
 
@@ -53,38 +53,37 @@
    - `PubSubClient`
    - `NTPClient`
    - `OneButton`
-   - `LittleFS` (ESP8266 文件系统支持)
-3. **打开项目**：打开 `examples/esp8266-waveshare-epd/examples/epd4in2-demo/epd4in2-demo.ino`。
-4. **编译与上传**：选择开发板型号（如 NodeMCU 1.0）并点击上传。
-5. **上传文件系统（可选）**：如果您有自定义的 BMP 图标，可以使用 ESP8266 LittleFS Data Upload 工具上传到 Flash 中。代码中已包含内置图标作为备用，因此此步骤非必须。
+3. **打开项目**：打开 `examples/esp32-waveshare-epd/examples/epd4in2-demo-esp32/epd4in2-demo-esp32.ino`。
+4. **开发板设置**：
+   - Board: `DOIT ESP32 DEVKIT V1`
+   - Partition Scheme: `Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)` **(重要：否则编译会报错空间不足)**
+5. **编译与上传**：连接开发板并上传代码。
 
 ## 配置指南
 
 ### 初始设置
 1. 给设备上电。
-2. 使用手机或电脑连接名为 `EPD-Display` 的 WiFi 热点。
-3. 打开浏览器，访问 `http://192.168.4.1`。
-4. 输入您的 WiFi 名称 (SSID)、密码以及 MQTT 服务器信息。
+2. 如果无法连接预设 WiFi，设备将开启 AP 模式，热点名为 `EPD-Display-XXXX` (XXXX为MAC地址后四位)。
+3. 连接热点后，打开浏览器访问 `http://192.168.4.1`。
+4. 配置 WiFi、MQTT 服务器、NTP 服务器等信息。
 5. 点击 **Save & Restart**（保存并重启）。
 
 ### MQTT 主题 (Topic)
-| 主题 | 方向 | 描述 |
-| :--- | :--- | :--- |
-| `epd/weather` | 订阅 | 接收 7 天天气预报的 JSON 数据,可以从其他任一天气数据源转换成终端期望的数据格式。 |
-[{"fxDate":"2026-02-14","textDay":"多云","iconDay":"101","windDirDay":"东风","windSpeedDay":"3","tempMax":"22","tempMin":"10","textNight":"多云","iconNight":"151"},{"fxDate":"2026-02-15","textDay":"多云","iconDay":"101","windDirDay":"东北风","windSpeedDay":"3","tempMax":"22","tempMin":"7","textNight":"中雨","iconNight":"306"},{"fxDate":"2026-02-16","textDay":"小雨","iconDay":"305","windDirDay":"东北风","windSpeedDay":"3","tempMax":"7","tempMin":"4","textNight":"小雨","iconNight":"305"},{"fxDate":"2026-02-17","textDay":"多云","iconDay":"101","windDirDay":"东北风","windSpeedDay":"3","tempMax":"8","tempMin":"2","textNight":"晴","iconNight":"150"},{"fxDate":"2026-02-18","textDay":"晴","iconDay":"100","windDirDay":"东风","windSpeedDay":"3","tempMax":"13","tempMin":"3","textNight":"晴","iconNight":"150"},{"fxDate":"2026-02-19","textDay":"多云","iconDay":"101","windDirDay":"北风","windSpeedDay":"3","tempMax":"14","tempMin":"5","textNight":"小雨","iconNight":"305"},{"fxDate":"2026-02-20","textDay":"晴","iconDay":"100","windDirDay":"南风","windSpeedDay":"3","tempMax":"20","tempMin":"9","textNight":"晴","iconNight":"150"}]
 
-| `epd/date` | 订阅 | 接收日历信息（阳历、农历、节气）。 |
-{"阳历日期":"2026-02-14","星期":"星期六","农历日期":"乙巳[蛇]年 腊月小廿七","节气信息":"距离下一节气【雨水】还有 4 天"}
+| 主题配置项 | 默认值 | 方向 | 描述 |
+| :--- | :--- | :--- | :--- |
+| Text Topic | `epd/text` | 订阅 | 接收并在屏幕上显示文本消息。 |
+| Weather Topic | `epd/weather` | 订阅 | 接收 7 天天气预报的 JSON 数据。 |
+| Date Topic | `epd/date` | 订阅 | 接收日历信息（阳历、农历、节气）。 |
+| Env Topic | `epd/env` | 订阅 | 接收室内环境数据 (`{"temp": "24", "humi": "50"}`)。 |
+| Calendar Topic | `epd/calendar` | 订阅 | 接收日历事件列表。 |
+| Shift Topic | `epd/shift` | 订阅 | 接收排班信息。 |
+| AQI Topic | `epd/air_quality` | 订阅 | 接收空气质量数据。 |
+| Weather Request | `epd/weatherrequest` | 发布 | 设备启动或双击按键时发送 "get" 消息请求更新天气。 |
 
-| `epd/env` | 订阅 | 接收室内环境数据（格式：`{"temp": "24", "humi": "50"}`）。 |
-{
-    "temp": 25.5,
-    "humi": 6.66
-}
-| `epd/weatherrequest` | 发布 | 设备启动或按键时发送 "get" 消息请求更新天气。 |
+### MQTT 数据格式示例
 
-### 天气数据格式 (JSON 示例)
-`epd/weather` 主题期望接收一个包含每日预报的 JSON 数组：
+**天气数据 (`epd/weather`)**:
 ```json
 [
   {
@@ -101,12 +100,20 @@
 ]
 ```
 
-## 图标系统
-- **格式支持**：支持上传到 LittleFS 的 **BMP** 图片（单色）。
-- **命名规范**：
-  - `100.bmp`: 标准图标（用于列表或小图标区域）。
-  - `100-L.bmp`: 大图标（用于主天气看板）。
-- **回退机制**：如果对应的 BMP 文件不存在，程序将自动使用 `icons.h` 中定义的内置 PROGMEM 图标。
+**日期信息 (`epd/date`)**:
+```json
+{
+  "阳历日期": "2023-10-27",
+  "星期": "星期五",
+  "农历日期": "癸卯年 九月十三",
+  "节气信息": "霜降第4天"
+}
+```
 
-## 许可证
-本项目开源，欢迎随意修改和分发。
+**环境数据 (`epd/env`)**:
+```json
+{
+  "temp": 25.5,
+  "humi": 60.0
+}
+```
