@@ -9,8 +9,7 @@
 
 // Forward declaration
 extern Config config;
-extern WebServer server;
-extern const char* build_date;
+extern WebServer server;extern const char* build_date;
 extern const char* build_time;
 extern void saveConfig();
 extern void displayMessage(String text);
@@ -181,9 +180,15 @@ const char INDEX_HTML_TEMPLATE[] PROGMEM = R"rawliteral(
           <input type='text' name='mqtt_air_quality_topic' value='%MQTT_AQI%' placeholder="AQI Topic">
         </div>
         
-        <h3>NTP Server</h3>
+        <h3>NTP Servers</h3>
         <div class="grid-2-col">
-            <input type='text' name='ntp_server' value='%NTP_SERVER%' placeholder="NTP Server (e.g. pool.ntp.org)">
+            <input type='text' name='ntp_server' value='%NTP_SERVER%' placeholder="Primary NTP Server">
+            <input type='text' name='ntp_server_2' value='%NTP_SERVER_2%' placeholder="Secondary NTP Server">
+        </div>
+
+        <h3>Full Refresh Period (Minutes)</h3>
+        <div class="grid-2-col">
+            <input type='number' name='full_refresh_period' value='%FULL_REFRESH%' placeholder="0 = Disabled">
         </div>
 
         <input type='submit' value='Save & Restart' style="margin-top: 20px;">

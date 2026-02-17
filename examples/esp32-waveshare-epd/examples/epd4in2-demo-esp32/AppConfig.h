@@ -16,6 +16,8 @@ struct Config {
   char mqtt_shift_topic[64] = "epd/shift";
   char mqtt_air_quality_topic[64] = "epd/air_quality";
   char ntp_server[64] = "ntp1.aliyun.com";
+  char ntp_server_2[64] = "ntp2.aliyun.com";
+  int full_refresh_period = 0; // minutes, 0 = disabled
   bool invert_display = false;
 };
 

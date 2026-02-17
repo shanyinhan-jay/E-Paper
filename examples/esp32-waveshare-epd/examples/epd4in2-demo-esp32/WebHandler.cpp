@@ -19,6 +19,7 @@ String processor(const String& var) {
   if(var == "MQTT_CALENDAR") return String(config.mqtt_calendar_topic);
   if(var == "MQTT_SHIFT") return String(config.mqtt_shift_topic);
   if(var == "MQTT_AQI") return String(config.mqtt_air_quality_topic);
+  if(var == "FULL_REFRESH") return String(config.full_refresh_period);
   if(var == "BUILD_DATE") return String(build_date);
   if(var == "BUILD_TIME") return String(build_time);
   return String();
@@ -44,6 +45,8 @@ void handleRoot() {
   html.replace("%MQTT_SHIFT%", String(config.mqtt_shift_topic));
   html.replace("%MQTT_AQI%", String(config.mqtt_air_quality_topic));
   html.replace("%NTP_SERVER%", String(config.ntp_server));
+  html.replace("%NTP_SERVER_2%", String(config.ntp_server_2));
+  html.replace("%FULL_REFRESH%", String(config.full_refresh_period));
   
   // Handle Radio Button State
   if (config.invert_display) {
@@ -176,6 +179,8 @@ void handleSaveConfig() {
   if (server.hasArg("mqtt_shift_topic")) strlcpy(config.mqtt_shift_topic, server.arg("mqtt_shift_topic").c_str(), sizeof(config.mqtt_shift_topic));
   if (server.hasArg("mqtt_air_quality_topic")) strlcpy(config.mqtt_air_quality_topic, server.arg("mqtt_air_quality_topic").c_str(), sizeof(config.mqtt_air_quality_topic));
   if (server.hasArg("ntp_server")) strlcpy(config.ntp_server, server.arg("ntp_server").c_str(), sizeof(config.ntp_server));
+  if (server.hasArg("ntp_server_2")) strlcpy(config.ntp_server_2, server.arg("ntp_server_2").c_str(), sizeof(config.ntp_server_2));
+  if (server.hasArg("full_refresh_period")) config.full_refresh_period = server.arg("full_refresh_period").toInt();
   if (server.hasArg("invert_display")) config.invert_display = (server.arg("invert_display") == "1");
   
   saveConfig();

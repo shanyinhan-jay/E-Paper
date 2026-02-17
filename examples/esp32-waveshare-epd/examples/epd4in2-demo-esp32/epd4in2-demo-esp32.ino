@@ -218,6 +218,9 @@ void loadConfig() {
           strlcpy(config.mqtt_calendar_topic, doc["mqtt_calendar_topic"] | "epd/calendar", sizeof(config.mqtt_calendar_topic));
           strlcpy(config.mqtt_shift_topic, doc["mqtt_shift_topic"] | "epd/shift", sizeof(config.mqtt_shift_topic));
           strlcpy(config.mqtt_air_quality_topic, doc["mqtt_air_quality_topic"] | "epd/air_quality", sizeof(config.mqtt_air_quality_topic));
+          strlcpy(config.ntp_server, doc["ntp_server"] | "ntp1.aliyun.com", sizeof(config.ntp_server));
+          strlcpy(config.ntp_server_2, doc["ntp_server_2"] | "ntp2.aliyun.com", sizeof(config.ntp_server_2));
+          config.full_refresh_period = doc["full_refresh_period"] | 0;
           config.invert_display = doc["invert_display"] | false;
         }
       }
@@ -253,6 +256,9 @@ void saveConfig() {
   doc["mqtt_calendar_topic"] = config.mqtt_calendar_topic;
   doc["mqtt_shift_topic"] = config.mqtt_shift_topic;
   doc["mqtt_air_quality_topic"] = config.mqtt_air_quality_topic;
+  doc["ntp_server"] = config.ntp_server;
+  doc["ntp_server_2"] = config.ntp_server_2;
+  doc["full_refresh_period"] = config.full_refresh_period;
   doc["invert_display"] = config.invert_display;
 
   File configFile = LittleFS.open("/config.json", "w");
@@ -1833,18 +1839,19 @@ void setup() {
           Serial.println("MQTT Connected! AP Disabled.");
           
           // Setup NTP (Only after MQTT is connected)
-          if (strlen(config.ntp_server) > 0) {
-              timeClient.setPoolServerName(config.ntp_server);
-          } else {
-              timeClient.setPoolServerName("ntp1.aliyun.com");
-          }
+          const char* ntp1 = (strlen(config.ntp_server) > 0) ? config.ntp_server : "ntp1.aliyun.com";
+          const char* ntp2 = (strlen(config.ntp_server_2) > 0) ? config.ntp_server_2 : "ntp2.aliyun.com";
+          
+          timeClient.setPoolServerName(ntp1);
           timeClient.setTimeOffset(28800);
           timeClient.begin(); // Start NTP
           
-          Serial.print("Waiting for NTP...");
+          Serial.printf("Waiting for NTP (%s)...", ntp1);
           // Reduced retry count since we are already connected to internet
           int retry = 0;
           bool ntpSynced = false;
+          bool usingSecondary = false;
+          
           while(retry < 10) { 
               if (timeClient.forceUpdate()) {
                   ntpSynced = true;
@@ -1853,6 +1860,13 @@ void setup() {
               delay(500);
               Serial.print(".");
               retry++;
+              
+              // Switch to secondary after 5 attempts
+              if (retry == 5 && !usingSecondary && strlen(ntp2) > 0) {
+                  Serial.printf("\nSwitching to Secondary NTP (%s)...", ntp2);
+                  timeClient.setPoolServerName(ntp2);
+                  usingSecondary = true;
+              }
           }
           if (ntpSynced) {
               Serial.println(" Synced");
@@ -2064,15 +2078,48 @@ void loop() {
   
   // Optimized NTP Sync Strategy (Only if MQTT is connected)
   static unsigned long lastNtpRetry = 0;
+  static int ntpRetryCount = 0;
+  static bool usingSecondaryNtp = false;
+
   if (client.connected()) {
       if (!timeClient.isTimeSet()) {
           if (millis() - lastNtpRetry > 5000) { // Retry every 5 seconds
               lastNtpRetry = millis();
               Serial.println("NTP not synced, forcing update...");
-              timeClient.forceUpdate();
+              if (timeClient.forceUpdate()) {
+                   Serial.println("NTP Synced (Loop)");
+                   ntpRetryCount = 0;
+              } else {
+                   ntpRetryCount++;
+                   if (ntpRetryCount >= 3) {
+                       ntpRetryCount = 0;
+                       usingSecondaryNtp = !usingSecondaryNtp;
+                       
+                       const char* ntp1 = (strlen(config.ntp_server) > 0) ? config.ntp_server : "ntp1.aliyun.com";
+                       const char* ntp2 = (strlen(config.ntp_server_2) > 0) ? config.ntp_server_2 : "ntp2.aliyun.com";
+                       const char* nextServer = usingSecondaryNtp ? ntp2 : ntp1;
+                       
+                       Serial.printf("NTP Failed 3 times. Switching to: %s\n", nextServer);
+                       timeClient.setPoolServerName(nextServer);
+                   }
+              }
           }
       } else {
           timeClient.update();
+      }
+  }
+  
+  // Custom Full Refresh Timer
+  static unsigned long lastFullRefreshTime = millis();
+  if (config.full_refresh_period > 0) {
+      if (millis() - lastFullRefreshTime > (unsigned long)config.full_refresh_period * 60 * 1000) {
+          lastFullRefreshTime = millis();
+          Serial.println("Custom Full Refresh Triggered");
+          if (currentPage == PAGE_WEATHER) {
+               displayWeatherDashboard(false); // Full refresh
+          } else if (currentPage == PAGE_CALENDAR) {
+               displayCalendarPage(false); // Full refresh
+          }
       }
   }
   
