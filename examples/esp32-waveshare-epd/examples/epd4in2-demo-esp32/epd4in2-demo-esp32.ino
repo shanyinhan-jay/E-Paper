@@ -1931,18 +1931,19 @@ void setup() {
   String statusMsg = "";
   if (WiFi.status() == WL_CONNECTED) {
       statusMsg = "WiFi: " + String(config.wifi_ssid) + "\nIP: " + WiFi.localIP().toString() + "\nConfigure via Web UI (IP)";
+      wifiWarningShown = false;
   } else {
       statusMsg = "AP: " + String(ap_ssid) + "\nIP: 192.168.4.1\nConfigure via Web UI";
+      wifiWarningShown = true; // Prevent loop from overwriting AP message with "WiFi Lost"
   }
   displayMessage(statusMsg);
 }
 
 void loop() {
-  ArduinoOTA.handle();
   button.tick();
   server.handleClient();
   
-  // WiFi Handling
+  // WiFi Handling & Blocking
   if (strlen(config.wifi_ssid) > 0) {
       if (WiFi.status() != WL_CONNECTED) {
           if (!wifiWarningShown) {
@@ -1950,6 +1951,8 @@ void loop() {
               displayMessage("WiFi Connection Lost\nReconnecting...");
               wifiWarningShown = true;
           }
+          delay(500);
+          return; // Stop subsequent programs until WiFi is re-established
       } else {
           if (wifiWarningShown) {
               Serial.println("WiFi Restored");
@@ -1959,6 +1962,8 @@ void loop() {
           }
       }
   }
+
+  ArduinoOTA.handle();
 
   if (strlen(config.mqtt_server) > 0 && WiFi.status() == WL_CONNECTED) {
       if (!client.connected()) {
