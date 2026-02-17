@@ -28,14 +28,16 @@
 - **连接线若干**。
 
 ### 引脚配置
-
-  EPD_SCK_PIN  13
-  EPD_MOSI_PIN 14
-  EPD_CS_PIN   15
-  EPD_RST_PIN  26
-  EPD_DC_PIN   27
-  EPD_BUSY_PIN 25
-  BUTTON_PIN   0
+| 墨水屏引脚 | ESP32 GPIO | 描述 |
+| :--- | :--- | :--- |
+| BUSY | GPIO 25 | 忙信号 |
+| RST | GPIO 26 | 复位 |
+| DC | GPIO 27 | 数据/命令选择 |
+| CS | GPIO 15 | 片选 |
+| CLK | GPIO 13 | SPI 时钟 |
+| DIN | GPIO 14 | SPI 数据 (MOSI) |
+| GND | GND | 地 |
+| VCC | 3.3V | 电源 |
 
 **其他硬件：**
 - **按钮**：GPIO 0 (低电平触发/Active Low) - 单击切换页面，长按全刷当前页面。
