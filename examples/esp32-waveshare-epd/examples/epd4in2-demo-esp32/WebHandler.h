@@ -179,6 +179,11 @@ const char INDEX_HTML_TEMPLATE[] PROGMEM = R"rawliteral(
           <input type='text' name='mqtt_air_quality_topic' value='%MQTT_AQI%' placeholder="AQI Topic">
         </div>
         
+        <h3>NTP Server</h3>
+        <div class="grid-2-col">
+            <input type='text' name='ntp_server' value='%NTP_SERVER%' placeholder="NTP Server (e.g. pool.ntp.org)">
+        </div>
+
         <input type='submit' value='Save & Restart' style="margin-top: 20px;">
       </form>
     </div>

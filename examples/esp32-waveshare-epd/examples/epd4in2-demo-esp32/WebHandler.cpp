@@ -43,6 +43,7 @@ void handleRoot() {
   html.replace("%MQTT_CALENDAR%", String(config.mqtt_calendar_topic));
   html.replace("%MQTT_SHIFT%", String(config.mqtt_shift_topic));
   html.replace("%MQTT_AQI%", String(config.mqtt_air_quality_topic));
+  html.replace("%NTP_SERVER%", String(config.ntp_server));
   
   // Handle Radio Button State
   if (config.invert_display) {
@@ -174,6 +175,7 @@ void handleSaveConfig() {
   if (server.hasArg("mqtt_calendar_topic")) strlcpy(config.mqtt_calendar_topic, server.arg("mqtt_calendar_topic").c_str(), sizeof(config.mqtt_calendar_topic));
   if (server.hasArg("mqtt_shift_topic")) strlcpy(config.mqtt_shift_topic, server.arg("mqtt_shift_topic").c_str(), sizeof(config.mqtt_shift_topic));
   if (server.hasArg("mqtt_air_quality_topic")) strlcpy(config.mqtt_air_quality_topic, server.arg("mqtt_air_quality_topic").c_str(), sizeof(config.mqtt_air_quality_topic));
+  if (server.hasArg("ntp_server")) strlcpy(config.ntp_server, server.arg("ntp_server").c_str(), sizeof(config.ntp_server));
   if (server.hasArg("invert_display")) config.invert_display = (server.arg("invert_display") == "1");
   
   saveConfig();

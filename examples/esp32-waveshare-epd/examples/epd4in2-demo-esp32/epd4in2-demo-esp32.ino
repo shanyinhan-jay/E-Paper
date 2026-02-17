@@ -46,7 +46,7 @@ WebServer server(80);
 WiFiClient espClient;
 PubSubClient client(espClient);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "ntp1.aliyun.com", 28800); // UTC+8 for China
+NTPClient timeClient(ntpUDP); 
 UBYTE *BlackImage = NULL;
 OneButton button(BUTTON_PIN, true); // GPIO defined in DEV_Config.h, Active Low
 
@@ -1009,11 +1009,11 @@ void displayWeatherDashboard(bool partial_update = false) {
             int wdX = panelCenterX - (totalW / 2); // 以右侧面板中心居中
             int wdY = 128; // 垂直位置：位于温度下方，室内温室度上方
             
-            // 绘制第一部分 (模拟粗体)
+            // 绘制第一部分 
             u8g2.drawUTF8(wdX, wdY, weatherDetailPart1.c_str());
-            u8g2.drawUTF8(wdX + 1, wdY, weatherDetailPart1.c_str());
+            u8g2.drawUTF8(wdX, wdY, weatherDetailPart1.c_str());
             
-            // 绘制第二部分 "级" (模拟粗体)
+            // 绘制第二部分 "级"
             if (jiPart.length() > 0) {
                 u8g2.drawUTF8(wdX + wdW1 + gap, wdY, jiPart.c_str());
                 u8g2.drawUTF8(wdX + wdW1 + gap + 1, wdY, jiPart.c_str());
@@ -1683,8 +1683,14 @@ bool reconnect() {
       }
       
       // Send Weather Request on Connect
-      client.publish("epd/weatherrequest", "get");
-      Serial.println("Weather Request sent");
+      client.loop();
+      delay(100);
+      
+      if (client.publish("epd/weatherrequest", "get")) {
+          Serial.println("Weather Request sent (Reconnect)");
+      } else {
+          Serial.println("Weather Request failed (Reconnect)");
+      }
       return true;
 
     } else {
@@ -1736,6 +1742,7 @@ void handleButtonLongPress() {
 unsigned long lastMqttRetry = 0;
 bool wifiWarningShown = false;
 bool mqttWarningShown = false;
+bool mqttGiveUp = false; // Add give up flag
 
 void setup() {
   printf("EPD_4IN2 WiFi Demo\r\n");
@@ -1766,6 +1773,14 @@ void setup() {
       if (WiFi.status() == WL_CONNECTED) {
           Serial.println("WiFi Connected! AP Disabled.");
           enableAP = false;
+          
+          // Setup NTP
+          if (strlen(config.ntp_server) > 0) {
+              timeClient.setPoolServerName(config.ntp_server);
+          } else {
+              timeClient.setPoolServerName("ntp1.aliyun.com");
+          }
+          timeClient.setTimeOffset(28800);
           timeClient.begin(); // Start NTP
           
           // Wait for NTP Sync
@@ -1811,6 +1826,15 @@ void setup() {
       Serial.println("AP Started: " + ap_ssid);
   }
   
+  // Setup NTP
+  if (strlen(config.ntp_server) > 0) {
+      timeClient.setPoolServerName(config.ntp_server);
+  } else {
+      timeClient.setPoolServerName("ntp1.aliyun.com");
+  }
+  timeClient.setTimeOffset(28800);
+  timeClient.begin();
+  
   // Setup MQTT
   if (strlen(config.mqtt_server) > 0) {
       client.setServer(config.mqtt_server, config.mqtt_port);
@@ -1830,9 +1854,15 @@ void setup() {
           client.subscribe(config.mqtt_shift_topic);
           client.subscribe(config.mqtt_air_quality_topic);
           
+          client.loop(); // Process incoming messages (e.g. SUBACK)
+          delay(100);
+
           // Send Weather Request on Connect
-          client.publish("epd/weatherrequest", "get");
-          Serial.println("Weather Request sent (Setup)");
+          if (client.publish("epd/weatherrequest", "get")) {
+              Serial.println("Weather Request sent (Setup)");
+          } else {
+              Serial.println("Weather Request failed (Setup)");
+          }
       } else {
           Serial.print("MQTT Connect failed, rc=");
           Serial.println(client.state());
@@ -1932,22 +1962,30 @@ void loop() {
 
   if (strlen(config.mqtt_server) > 0 && WiFi.status() == WL_CONNECTED) {
       if (!client.connected()) {
-          unsigned long now = millis();
-          if (now - lastMqttRetry > 5000) {
-              lastMqttRetry = now;
-              
-              if (!mqttWarningShown) {
-                   displayMessage("MQTT Connection Lost\nReconnecting...");
-                   mqttWarningShown = true;
-              }
-              
-              if (reconnect()) {
-                   displayMessage("MQTT Connected!\nFetching Weather...");
-                   mqttWarningShown = false;
+          if (!mqttGiveUp) {
+              unsigned long now = millis();
+              if (now - lastMqttRetry > 5000) {
+                  lastMqttRetry = now;
+                  
+                  if (!mqttWarningShown) {
+                       displayMessage("MQTT Connection Lost\nReconnecting...");
+                       mqttWarningShown = true;
+                  }
+                  
+                  if (reconnect()) {
+                       displayMessage("MQTT Connected!\nFetching Weather...");
+                       mqttWarningShown = false;
+                  } else {
+                       // If reconnect fails, give up and show error
+                       mqttGiveUp = true;
+                       displayMessage("MQTT Connect Failed\nWill not retry");
+                       Serial.println("MQTT Connect Failed, giving up");
+                  }
               }
           }
       } else {
           client.loop();
+          mqttGiveUp = false; // Reset give up flag on successful connection
   
   // Handle deferred updates
   if (millis() - lastUpdateTrigger > UPDATE_DELAY_MS) {

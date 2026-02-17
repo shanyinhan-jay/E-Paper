@@ -15,6 +15,7 @@ struct Config {
   char mqtt_calendar_topic[64] = "epd/calendar";
   char mqtt_shift_topic[64] = "epd/shift";
   char mqtt_air_quality_topic[64] = "epd/air_quality";
+  char ntp_server[64] = "ntp1.aliyun.com";
   bool invert_display = false;
 };
 
