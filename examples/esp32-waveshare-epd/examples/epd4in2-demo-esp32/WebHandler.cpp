@@ -19,8 +19,8 @@ String processor(const String& var) {
   if(var == "MQTT_CALENDAR") return String(config.mqtt_calendar_topic);
   if(var == "MQTT_SHIFT") return String(config.mqtt_shift_topic);
   if(var == "MQTT_AQI") return String(config.mqtt_air_quality_topic);
-  if(var == "BUILD_DATE") return String(__DATE__);
-  if(var == "BUILD_TIME") return String(__TIME__);
+  if(var == "BUILD_DATE") return String(build_date);
+  if(var == "BUILD_TIME") return String(build_time);
   return String();
 }
 
@@ -54,8 +54,8 @@ void handleRoot() {
       html.replace("%INVERT_1%", "");
   }
   
-  html.replace("%BUILD_DATE%", String(__DATE__));
-  html.replace("%BUILD_TIME%", String(__TIME__));
+  html.replace("%BUILD_DATE%", String(build_date));
+  html.replace("%BUILD_TIME%", String(build_time));
   
   server.send(200, "text/html", html);
 }

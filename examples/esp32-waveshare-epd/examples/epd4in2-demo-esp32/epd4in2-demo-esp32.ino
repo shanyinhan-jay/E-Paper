@@ -41,6 +41,9 @@ extern const uint8_t u8g2_font_open_iconic_weather_4x_t[] U8X8_PROGMEM;
 extern const uint8_t u8g2_font_logisoso60_tf[] U8X8_PROGMEM;
 extern const uint8_t u8g2_font_logisoso30_tf[] U8X8_PROGMEM;
 
+const char* build_date = __DATE__;
+const char* build_time = __TIME__;
+
 WebServer server(80);
 
 WiFiClient espClient;
@@ -1771,37 +1774,12 @@ void setup() {
       Serial.println();
       
       if (WiFi.status() == WL_CONNECTED) {
-          Serial.println("WiFi Connected! AP Disabled.");
-          enableAP = false;
+          Serial.println("WiFi Connected! Keeping AP for MQTT...");
+          enableAP = true; // Keep AP enabled until MQTT connects
+          WiFi.mode(WIFI_AP_STA); 
           
-          // Setup NTP
-          if (strlen(config.ntp_server) > 0) {
-              timeClient.setPoolServerName(config.ntp_server);
-          } else {
-              timeClient.setPoolServerName("ntp1.aliyun.com");
-          }
-          timeClient.setTimeOffset(28800);
-          timeClient.begin(); // Start NTP
-          
-          // Wait for NTP Sync
-          Serial.print("Waiting for NTP...");
-          int retry = 0;
-          bool ntpSynced = false;
-          while(retry < 40) { // Try for 20 seconds
-              if (timeClient.forceUpdate()) {
-                  ntpSynced = true;
-                  break;
-              }
-              delay(500);
-              Serial.print(".");
-              retry++;
-          }
-          if (ntpSynced) {
-              Serial.println(" Synced");
-              Serial.println(timeClient.getFormattedTime());
-          } else {
-              Serial.println(" Timeout (Will retry in background)");
-          }
+          // NTP Setup removed from here, moved to after MQTT connect
+
 
       } else {
           Serial.println("WiFi Timeout. Enabling AP.");
@@ -1826,7 +1804,8 @@ void setup() {
       Serial.println("AP Started: " + ap_ssid);
   }
   
-  // Setup NTP
+  // Setup NTP (Moved to inside MQTT connect block)
+  /*
   if (strlen(config.ntp_server) > 0) {
       timeClient.setPoolServerName(config.ntp_server);
   } else {
@@ -1834,6 +1813,7 @@ void setup() {
   }
   timeClient.setTimeOffset(28800);
   timeClient.begin();
+  */
   
   // Setup MQTT
   if (strlen(config.mqtt_server) > 0) {
@@ -1846,6 +1826,41 @@ void setup() {
       clientId += String(random(0xffff), HEX);
       if (client.connect(clientId.c_str(), config.mqtt_user, config.mqtt_pass)) {
           Serial.println("MQTT Connected (Setup)");
+          
+          // Disable AP after successful MQTT connection
+          WiFi.softAPdisconnect(true);
+          WiFi.mode(WIFI_STA);
+          Serial.println("MQTT Connected! AP Disabled.");
+          
+          // Setup NTP (Only after MQTT is connected)
+          if (strlen(config.ntp_server) > 0) {
+              timeClient.setPoolServerName(config.ntp_server);
+          } else {
+              timeClient.setPoolServerName("ntp1.aliyun.com");
+          }
+          timeClient.setTimeOffset(28800);
+          timeClient.begin(); // Start NTP
+          
+          Serial.print("Waiting for NTP...");
+          // Reduced retry count since we are already connected to internet
+          int retry = 0;
+          bool ntpSynced = false;
+          while(retry < 10) { 
+              if (timeClient.forceUpdate()) {
+                  ntpSynced = true;
+                  break;
+              }
+              delay(500);
+              Serial.print(".");
+              retry++;
+          }
+          if (ntpSynced) {
+              Serial.println(" Synced");
+              Serial.println(timeClient.getFormattedTime());
+          } else {
+              Serial.println(" Timeout (Will retry in background)");
+          }
+
           client.subscribe(config.mqtt_topic);
           client.subscribe(config.mqtt_weather_topic);
           client.subscribe(config.mqtt_date_topic);
@@ -1963,6 +1978,23 @@ void loop() {
       }
   }
 
+  // MQTT Blocking Check (If failed to connect, stop everything else)
+  if (mqttGiveUp) {
+      if (!mqttWarningShown) {
+           Serial.println("MQTT Failed (Persistent). AP Enabled.");
+           // Ensure AP is active for config
+           if ((WiFi.getMode() & WIFI_AP) == 0) {
+                WiFi.mode(WIFI_AP_STA);
+                WiFi.softAP(ap_ssid.c_str());
+           }
+           String msg = "MQTT Connect Failed\nConfig via AP: " + ap_ssid + "\nOr IP: " + WiFi.localIP().toString();
+           displayMessage(msg);
+           mqttWarningShown = true;
+      }
+      delay(100);
+      return; 
+  }
+
   ArduinoOTA.handle();
 
   if (strlen(config.mqtt_server) > 0 && WiFi.status() == WL_CONNECTED) {
@@ -1980,10 +2012,13 @@ void loop() {
                   if (reconnect()) {
                        displayMessage("MQTT Connected!\nFetching Weather...");
                        mqttWarningShown = false;
+                       // Disable AP if reconnected
+                       WiFi.softAPdisconnect(true);
+                       WiFi.mode(WIFI_STA);
                   } else {
-                       // If reconnect fails, give up and show error
+                       // If reconnect fails, give up
                        mqttGiveUp = true;
-                       displayMessage("MQTT Connect Failed\nWill not retry");
+                       mqttWarningShown = false; // Reset so blocking block can show message
                        Serial.println("MQTT Connect Failed, giving up");
                   }
               }
@@ -2027,16 +2062,18 @@ void loop() {
       switchPagePending = false;
   }
   
-  // Optimized NTP Sync Strategy
+  // Optimized NTP Sync Strategy (Only if MQTT is connected)
   static unsigned long lastNtpRetry = 0;
-  if (!timeClient.isTimeSet()) {
-      if (millis() - lastNtpRetry > 5000) { // Retry every 5 seconds
-          lastNtpRetry = millis();
-          Serial.println("NTP not synced, forcing update...");
-          timeClient.forceUpdate();
+  if (client.connected()) {
+      if (!timeClient.isTimeSet()) {
+          if (millis() - lastNtpRetry > 5000) { // Retry every 5 seconds
+              lastNtpRetry = millis();
+              Serial.println("NTP not synced, forcing update...");
+              timeClient.forceUpdate();
+          }
+      } else {
+          timeClient.update();
       }
-  } else {
-      timeClient.update();
   }
   
   // Check for minute change

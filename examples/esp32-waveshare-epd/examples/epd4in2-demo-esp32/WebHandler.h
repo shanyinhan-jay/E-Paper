@@ -10,6 +10,8 @@
 // Forward declaration
 extern Config config;
 extern WebServer server;
+extern const char* build_date;
+extern const char* build_time;
 extern void saveConfig();
 extern void displayMessage(String text);
 extern void displayWeatherDashboard(bool partial_update);
