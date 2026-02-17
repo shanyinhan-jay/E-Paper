@@ -29,7 +29,6 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <esp_task_wdt.h>
 
 #include <Adafruit_GFX.h>
 #include <U8g2_for_Adafruit_GFX.h>
@@ -306,7 +305,6 @@ void displayMessage(String text) {
         int i = 0;
         
         while (i < len) {
-            yield(); // Prevent WDT
             
             // Handle explicit newline
             if (text[i] == '\n') {
@@ -356,7 +354,6 @@ void displayMessage(String text) {
         // --- 3. Draw Lines (Centered) ---
         Serial.println("Drawing Lines");
         for (const String& line : lines) {
-            yield();
             int w = u8g2.getUTF8Width(line.c_str());
             int x = (logicalWidth - w) / 2;
             if (x < 0) x = 0;
@@ -421,7 +418,6 @@ void displayCalendarPage(bool partial_update = false) {
         const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
         for (int i = 0; i < 14; i++) {
-            yield(); // Prevent WDT
             time_t future = now + i * 86400;
             struct tm * t = gmtime(&future);
             
@@ -910,7 +906,6 @@ void displayWeatherDashboard(bool partial_update = false) {
 
         // === RIGHT SIDE (Today's Weather) ===
         if (currentForecastCount > 0) {
-            yield(); // Prevent WDT
             int iconX = 210;    
             int textCenterX = 340; // 用于温度显示的中心
             int panelCenterX = 300; // 整个右侧面板的中心 (200-400)
@@ -1897,15 +1892,6 @@ void setup() {
   });
   ArduinoOTA.begin();
 
-  // Initialize Task WDT
-  esp_task_wdt_config_t twdt_config = {
-      .timeout_ms = 30000,
-      .idle_core_mask = 0,
-      .trigger_panic = true,
-  };
-  esp_task_wdt_init(&twdt_config);
-  esp_task_wdt_add(NULL);      // Add current thread to WDT watch
-  
   // Setup Button
   button.attachClick(handleButtonClick);
   button.attachDoubleClick(handleButtonDoubleClick);
@@ -1922,7 +1908,6 @@ void setup() {
 }
 
 void loop() {
-  esp_task_wdt_reset(); // Reset Watchdog Timer
   ArduinoOTA.handle();
   button.tick();
   server.handleClient();

@@ -54,7 +54,6 @@ void EPD_7IN5B_HD_ReadBusy(void)
     printf("e-Paper busy\r\n");
     do {
         busy = DEV_Digital_Read(EPD_BUSY_PIN);
-		ESP.wdtFeed();
     } while(busy);
     printf("e-Paper busy release\r\n");
 	DEV_Delay_ms(200);
