@@ -221,6 +221,8 @@ void loadConfig() {
           strlcpy(config.ntp_server, doc["ntp_server"] | "ntp1.aliyun.com", sizeof(config.ntp_server));
           strlcpy(config.ntp_server_2, doc["ntp_server_2"] | "ntp2.aliyun.com", sizeof(config.ntp_server_2));
           config.full_refresh_period = doc["full_refresh_period"] | 0;
+          config.day_start_hour = doc["day_start_hour"] | 6;
+          config.day_end_hour = doc["day_end_hour"] | 18;
           config.invert_display = doc["invert_display"] | false;
         }
       }
@@ -259,6 +261,8 @@ void saveConfig() {
   doc["ntp_server"] = config.ntp_server;
   doc["ntp_server_2"] = config.ntp_server_2;
   doc["full_refresh_period"] = config.full_refresh_period;
+  doc["day_start_hour"] = config.day_start_hour;
+  doc["day_end_hour"] = config.day_end_hour;
   doc["invert_display"] = config.invert_display;
 
   File configFile = LittleFS.open("/config.json", "w");
@@ -920,7 +924,7 @@ void displayWeatherDashboard(bool partial_update = false) {
             int panelCenterX = 300; // 整个右侧面板的中心 (200-400)
             
             int currentHour = timeClient.getHours();
-            bool isNight = (currentHour >= 18 || currentHour < 6);
+            bool isNight = (currentHour >= config.day_end_hour || currentHour < config.day_start_hour);
             String iconCode = isNight ? currentForecast[0].icon_night : currentForecast[0].icon_day;
             String condText = isNight ? currentForecast[0].cond_night : currentForecast[0].cond_day;
             if (iconCode.length() == 0) iconCode = currentForecast[0].icon_day;
@@ -1772,7 +1776,7 @@ void setup() {
       
       Serial.print("Connecting to WiFi");
       int retry = 0;
-      while (WiFi.status() != WL_CONNECTED && retry < 20) { // 10 seconds
+      while (WiFi.status() != WL_CONNECTED && retry < 30) { // 15 seconds
           delay(500);
           Serial.print(".");
           retry++;
@@ -1830,7 +1834,22 @@ void setup() {
       // Attempt connection
       String clientId = "ESP32Client-";
       clientId += String(random(0xffff), HEX);
-      if (client.connect(clientId.c_str(), config.mqtt_user, config.mqtt_pass)) {
+
+      int mqttRetry = 0;
+      bool mqttConnected = false;
+      Serial.print("Connecting to MQTT");
+      while (mqttRetry < 30 && !mqttConnected) { // 15 seconds
+          if (client.connect(clientId.c_str(), config.mqtt_user, config.mqtt_pass)) {
+              mqttConnected = true;
+          } else {
+              delay(500);
+              Serial.print(".");
+              mqttRetry++;
+          }
+      }
+      Serial.println();
+      
+      if (mqttConnected) {
           Serial.println("MQTT Connected (Setup)");
           
           // Disable AP after successful MQTT connection
